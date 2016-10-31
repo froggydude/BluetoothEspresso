@@ -1,12 +1,8 @@
-//-------------Bluetooth Espresso
-//--------its still in the works, most of the functionality is on the RX side
-//----currently Working on TX
-
-
 #include <SoftwareSerial.h>
 #include <PID_Beta6.h>
 #include <max6675.h>
-
+//
+///--------------------todo, modularize, PID, test
 //------pin setup
 //----pump pin
 int pumppin = 13;
@@ -18,7 +14,7 @@ int thermoCLK = 5;
 int b2thRX = 11;
 int b2thTX = 12;
 //---------for temperature processing
-int _tempF;
+double _tempF;
 double output, input, _setpoint;
 //-------for autobrew
 int _PIBT, _PI, _bt;
@@ -30,7 +26,7 @@ PID espressoTime(&input, &output, &_setpoint, 1, 1, 1);
 //imitation serial port for blootooth, tastes just like fruit loops!
 SoftwareSerial blu2th(b2thRX, b2thTX);
 
-int d = 0;
+
 //---initialize some pins and such
 void setup() {
   // put your setup code here, to run once:
@@ -49,48 +45,42 @@ void setup() {
 
 
 }
+boolean resetBit = false;
 void loop() {
-  // put your main code here, to run repeatedly:
-  //-------_tempF gets passed to PID Blu2th for GOOi
- // _tempF = upDateTemp();
-  //espressoTime.Compute();
   //Serial.println(output);                 //debuggary
   //Serial.println("---------------");      //debuggary
   //Serial.println(_tempF);                 //debuggary
-  //heatControl(output);
-  //delay(100);
   if (blu2th.available()) {
     readBlu2th();
+    if (resetBit = false) { //first time its avalable, set resetBit to true
+      resetBit = true;
+    }
   }
-  else {
+ /* else if (!blu2th.available() && resetBit == true) //if the blu2th is not avalable, and it has been in the past (turn everything off
+  {
+    blu2th.end();           //close connection
+    Serial.end()
+    resetBit = false;       //reset bit for next time*/                   //think about this one
+  }
+  else {             //otherwise write buffer to bluetooth
     writeBlu2th();
   }
+
 }
-
-
 
 void heatControl(double _fromPID) {
 
 
 }
 //supply android with some information from arduino.
-int n;
-
 void writeBlu2th() {
+  char buffet[8] = "";           //buffer char array
+  _tempF = upDateTemp();         //get temp from thermocouple
+  sprintf(buffet, "%7.3f", _tempF);     //format char array as ---.---
+  blu2th.print(buffet);               //send buffer to android
 
-  String _tx;
-  int conv = (int)upDateTemp();
-  char buffet[4] = "";
-  _tx = String(upDateTemp());
-  Serial.println(_tx);
- sprintf(buffet, "%04d",conv);
-
-     blu2th.print(buffet);
-    blu2th.flush();
   delay(100);
   // Serial.println("---------------------------");
-  //delay(100);
-  // n++;
 }
 double upDateTemp()
 {
@@ -105,15 +95,11 @@ void readBlu2th()
 {
   byte f;
   String recieved = "";
-  // n++;
-  // if (blu2th.available())
-  //  {
   f = blu2th.read();
-  //Serial.println("SerAval");
-  //}
-
+  //-------------switch case for manual/auto
   switch (f)
   {
+    //-------------case manual begin pump
     case (2):
 
       digitalWrite(pumppin, HIGH);
@@ -129,83 +115,81 @@ void readBlu2th()
        blu2th.flush();
        n++;*/
       break;
-    //auto
+    //auto brew case
     case (3):
       autoBrew();
-      // digitalWrite(13,LOW);
-      // f = 1;  //after autobrew, goback to default
+      //after autobrew, goback to default, dont keep the pump going
       digitalWrite(pumppin, LOW);
       break;
+      //---------if preferences screen has been changed
     case (4):
       blu2thInput();
       break;
-
-
-
+      
     default:
       break;
   }
 }
+
+//AutoBrew function
 //  _PIBT(time for pump to saturate grinds)
 //  _PI(time to wait for brewing)
 //  _bt(time to pull a shot)
-
-
-
 void autoBrew() {
-
-  _PIBT = _PIBT * 1000;
+  //must multiply by 1000 for seconds
+  _PIBT = _PIBT * 1000;    
   _PI = _PI * 1000;
   _bt = _bt * 1000;
   digitalWrite(pumppin, HIGH);  //start pump
   //Serial.println(Serial.available());
   delay(_PIBT);                //for _PIBT ms
-  digitalWrite(pumppin, LOW);
-  delay(_PI);
-  digitalWrite(pumppin, HIGH);
-  delay(_bt);
-  //digitalWrite(pumppin,LOW); //turn off pump
-  // blu2th.print("done");
-}
+  digitalWrite(pumppin, LOW);  //disengauge pump
+  delay(_PI);                   //for this amount of time
+  digitalWrite(pumppin, HIGH);  //begin pump
+  delay(_bt);                 //for this amount of time
+  blu2th.print("done");         //signal done to android
+  
+}//go back to readBlu2th
+
+
 //sets _PIBT, _PI, _bt, and temperature
 void blu2thInput() {
   String b2Re;
-  if (blu2th.available()) {
-    b2Re = blu2th.readStringUntil('>');
-  }
-  String temp;
-  int i = 0;
-  char q;
-  int w = 1;
-  int g = 0;
-  Serial.println("--------------" + b2Re);
-  while (b2Re.length() >= i)
+    b2Re = blu2th.readStringUntil('>');      //store btstring from android
+  String temp;                              //temporary string storage (not to be confused with temperature)
+  int i = 0;                               //iterator for going char by char through the string
+  char q;                                  //temporary char varaible for storing bytes into String temp
+  int w = 1;                             //when a comma (',') is encountered, this controls the switch statment for breaking it up into variables
+  int g = 0;                                //another temporary variable for converting from string to int for storage into variabls
+  //Serial.println("--------------" + b2Re);     //debuggary
+  while (b2Re.length() >= i)                    //iterate though bluetooth string
   {
 
-    // Serial.println(_s.length());
-    //Serial.println(i);
-    q = b2Re[i];
-    //  Serial.println(q);
-    //------------------case a comma is read, convert to int and set variables accordingly
-    if (q == ',') {
-      g = temp.toInt();
+    q = b2Re[i];                              //store charactor from android string into q
+    //------------------case a comma is read, convert to int and set variables accordingly (pibt, pi,bt, stpoint)  
+    if (q == ',') {               //if there is a comma, do some processing
+      g = temp.toInt();                    //convert temp built string to int
       //Serial.println(g);
-      switch (w) {
+      switch (w) {                //switch based on what iteraton of string i.e: "1,2,3,4"
         case (1):
+          //first case is PIBT
           _PIBT = g;
           Serial.println(_PIBT);
           w++;
           break;
         case (2):
+          //second case is PI
           _PI = g;
           Serial.println(_PI);
           w++;
           break;
+          //third case is BT
         case (3):
           _bt = g;
           Serial.println(_bt);
           w++;
           break;
+          //forth case is temperature setpoint
         case (4):
           Serial.println(_setpoint);
           _setpoint = g;
@@ -213,14 +197,14 @@ void blu2thInput() {
         default:
           break;
       }
-      temp = "";
+      temp = "";   //if the string has been processed, start over
     }
     //----------end comma accorence
     //---otherwise add to temp string
     else {
-      temp = temp + q;
+      temp = temp + q;      //build string char by char
     }
 
-    i++;
+    i++;     //iterate thorugh temp string charbychar
   }
 }
