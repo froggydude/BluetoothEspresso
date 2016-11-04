@@ -7,4 +7,4 @@ I am using an arduino outfitted with an atmega328.  A thermocouple, BTmodule, So
 I decided Bluetooth, don't want a russian hacker making espresso on my machine. 
 
 Whats needed:
-Schematics, PID enabled, Testing, Android testing, Modularize is a possibility for an array for many machines
+Schematics, PID enabled, Testing, Android testing, Modularize is a possibility for an array for many machines, shot counter, syrup/sugar despenser
