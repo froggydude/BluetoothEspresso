@@ -1,12 +1,14 @@
-#include <SoftwareSerial.h>
+#include <SoftwareSerial.h> 
 #include <PID_Beta6.h>
 #include <max6675.h>
+#include <EEPROM.h>
 //
 ///--------------------todo, modularize, PID, test
 //------pin setup
-//----pump pin
+//----pump pin and heat pin
 int pumppin = 3;
-//thermocouple pis
+int heatPin = 4;
+//thermocouple pins
 int thermoDO = 7;
 int thermoCS = 6;
 int thermoCLK = 5;
@@ -16,13 +18,13 @@ int b2thTX = 12;
 //---------for temperature processing
 double _tempF;
 double output, input, _setpoint;
-//-------for autobrew
-int _PIBT, _PI, _bt;
+//-------defaults for autobrew(seconds)
+int _PIBT=5, _PI=5, _bt=15;
 //-----setup some objects to be used
 //thermocouple
 MAX6675 thermocouple(thermoCLK, thermoCS, thermoDO);
 //PID controller
-PID espressoTime(&input, &output, &_setpoint, 1, 1, 1);
+PID espressoTime(&input, &output, &_setpoint, 3, 4, 1);
 //imitation serial port for blootooth, tastes just like fruit loops!
 SoftwareSerial blu2th(b2thRX, b2thTX);
 
@@ -32,6 +34,7 @@ void setup() {
   // put your setup code here, to run once:
   //-----setup some pins
   pinMode(pumppin, OUTPUT);
+  pinMode(heatPin, OUTPUT);
   /*
   digitalWrite(13, HIGH);
   digitalWrite(13, LOW);//-----------some debuggary*/
@@ -40,7 +43,7 @@ void setup() {
   //initalize setpoint(get from Blu2th later
   _setpoint = 115;
   //-------initalize PID
-  //espressoTime.SetMode(1);
+  espressoTime.SetMode(AUTO);
   delay(500);
 
 
@@ -65,6 +68,10 @@ void loop() {
   else {             //otherwise write buffer to bluetooth
     writeBlu2th();
   }
+  
+  //update PID for heat control
+  espressoTime.Compute();
+  analogWrite(heatPin, output);
 
 }
 
@@ -75,13 +82,18 @@ void heatControl(double _fromPID) {
 
 }
 //supply android with some information from arduino.
+int count=0;
+String TempTX;
 void writeBlu2th() {
-  char buffet[8] = "";           //buffer char array
+ // char buffet[8] = "";           //buffer char array
   _tempF = upDateTemp();         //get temp from thermocouple
-  sprintf(buffet, "%7.3f", _tempF);     //format char array as ---.---
-  //blu2th.print(buffet);               //send buffer to android
-
-  delay(100);
+  TempTX = String(_tempF);
+ // sprintf(buffet, "%5.3f", _tempF);     //format char array as ---.---
+  blu2th.print(TempTX);               //send buffer to android
+  //Serial.println(_tempF);
+  
+  delay(400);
+  
   // Serial.println("---------------------------");
 }
 double upDateTemp()
@@ -95,6 +107,7 @@ double upDateTemp()
 
 void readBlu2th()
 {
+  
   byte f;
   String recieved = "";
   f = blu2th.read();
@@ -103,7 +116,7 @@ void readBlu2th()
   {
     //-------------case manual begin pump
     case (2):
-      Serial.println("initiate pump");
+     // Serial.println("initiate pump");
       digitalWrite(pumppin, HIGH);
       //  delay(100);
 
@@ -119,6 +132,9 @@ void readBlu2th()
       break;
     //auto brew case
     case (3):
+      Serial.print("enter case 3");
+      blu2th.print("startAB");
+      delay(500);
       autoBrew();
       //after autobrew, goback to default, dont keep the pump going
       digitalWrite(pumppin, LOW);
@@ -153,6 +169,8 @@ void autoBrew() {
   digitalWrite(pumppin, HIGH);
   delay(_bt);
   blu2th.print("done");
+  Serial.print("after shot terminated string");
+  delay(500);// bufferTime
 }
 //sets _PIBT, _PI, _bt, and temperature
 void blu2thInput() {
