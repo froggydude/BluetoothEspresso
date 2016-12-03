@@ -36,7 +36,7 @@ int _PIBT = 5, _PI = 5, _bt = 15;
 MAX6675 thermocouple(thermoCLK, thermoCS, thermoDO);
 //PID controller
 PID espressoTime(&input, &output, &_setpoint, 1, 4, 1);
-//imitation serial port for blootooth, tastes just like fruit oh's!
+//imitation serial port for blootooth, tastes just like fruit tori!
 SoftwareSerial blu2th(b2thRX, b2thTX);
 
 
