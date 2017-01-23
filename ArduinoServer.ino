@@ -5,7 +5,9 @@
      
 
       Got the max6675 library from Ladyada
+                    https://github.com/adafruit/MAX6675-library
       found the PID with my roasting program, provided by  Brett Beauregard
+                  https://github.com/johnmccombs/arduino-libraries/tree/master/PID_Beta6
       
 
 */
